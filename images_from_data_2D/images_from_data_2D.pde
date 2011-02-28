@@ -48,14 +48,10 @@ int screen_height = 800;
 int background_color = 0;
 int tempo = 240;
 
-int ievent = 0;
-
 float xpos;
 float ypos;
 
 int num_times = 0;
-
-float[] ell_vals = new float[4];
 
 float[] time_steps = new float[127];
 float[][] xpositions = new float[127][500];
@@ -140,23 +136,21 @@ void setup()
     // Path
     String path = dataPath("");
     println("Listing all filenames in a directory: ");
-    println(path);
+    //println(path);
     String[] temp_filenames = listFileNames(path);
     int nfiles = temp_filenames.length;
-    println(temp_filenames);
+    //println(temp_filenames);
     int j = 0;
     for (int i=0;i<nfiles;i++)
     {
         if (temp_filenames[i].endsWith("txt"))
         {
-            println(temp_filenames[i]);
+            //println(temp_filenames[i]);
             filenames = append(filenames, temp_filenames[i]);
             j++;
         }
     }
-    println(filenames);
-
-
+    //println(filenames);
 
     controlP5 = new ControlP5(this);
     controlP5.setAutoDraw(false);
@@ -165,8 +159,6 @@ void setup()
 
     controlP5.addButton("Play",0,10, 60,50,19);
     controlP5.addButton("Stop",0,100,60,50,19);
-
-
 
     //makeMusic();
 
@@ -178,7 +170,6 @@ void setup()
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 void draw() {
-    //ellipse(ell_vals[0],ell_vals[1],ell_vals[2],ell_vals[3]);
     if (process_file)
     {
         makeMusic();
@@ -200,7 +191,22 @@ void makeMusic()
     fill(255,193,193);
     if (process_file)
     {
+        process_file = false;
+        println("Just inside of process_file");
         score.empty();
+
+        String line = "DEFAULTLINE";
+        try{
+            line = reader.readLine();
+            num_sound_events = int(line);
+            println("num_sound_events: " + num_sound_events);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            exit();
+        }
+
 
         ///////////////////////////////////////////////////////////////////////////
         // Zero out the arrays
@@ -216,7 +222,6 @@ void makeMusic()
         }
         ///////////////////////////////////////////////////////////////////////////
 
-
         float prev_time = 0.0;
         float now_time = 0.0;
 
@@ -227,8 +232,6 @@ void makeMusic()
 
         int count = 0;
 
-        //String[] vals = split(lines[ievent], ' ');
-        ievent++;
 
         //int nentries = int(vals[0]);
         //println("nentries: " + nentries);
@@ -237,11 +240,10 @@ void makeMusic()
         //max = 125;
         //max = 300;
         int callbackID = 1;
-        //for (int i = ievent; i < max; i++) 
         for (int i = 0; i < num_sound_events; i++) 
         {
             // Read in a line
-            String line = "DEFAULTLINE";
+            //String line = "DEFAULTLINE";
             try{
                 line = reader.readLine();
             }
@@ -252,7 +254,6 @@ void makeMusic()
 
             //line = reader.readLine();
             String[] vals = split(line, ' ');
-            //vals = split(lines[ievent], ' ');
             //println(vals);
 
             if (vals.length>1)
@@ -378,26 +379,23 @@ void makeMusic()
                 score.addNote(note_time, channel, instrument, pitch, volume, duration, articulation, pan);
                 //int id = i+1;
                 //id = id%200 + 1;
-                //println("i+1: " + id);
                 //score.addCallback(note_time, id);
                 // callbackID seems to need to be less than 127!!!! ???
                 if (!found_time)
                 {
                     score.addCallback(note_time, callbackID);
+                    println("callbackID: " + callbackID + " " + note_time);
                     callbackID++;
                 }
                 // The integer here (callbackID) has to be less than 256!
                 //score.addCallback(note_time, 1);
-
             }
-            ievent++;
-
         }
 
-        for (int j=0;j<num_times;j++)
-        {
+        //for (int j=0;j<num_times;j++)
+        //{
             //println("time_steps/xpositions: " + time_steps[j] + " " + xpositions[j][0]);
-        }
+        //}
 
         //note_time+=10;
         note_time=max_note_time + 2;
@@ -407,12 +405,13 @@ void makeMusic()
         println("Playing something!!!!!!!!!! --------------------- ");
 
         draw_background = false;
+        process_file = false;
+        //background(0);
         score.play();
         //score.writeMidiFile("my_test.mid");
 
         println("PLAYING!");
 
-        process_file = false;
 
         //exit();
 
@@ -438,11 +437,12 @@ void handleCallbacks(int callbackID) {
     //println("callbackID: " + int(callbackID));
     switch (callbackID) {
         case 0:
-            //while (score.isPlaying()) {};
+            
             score.stop();
             background(background_color);
             println("About to makeMusic from case 0");
             // Read in a line
+            /*
             String line = "DEFAULTLINE";
             try{
                 line = reader.readLine();
@@ -454,9 +454,11 @@ void handleCallbacks(int callbackID) {
                 e.printStackTrace();
                 exit();
             }
+            */
 
             process_file = true;
             draw_background = true;
+            score.empty();
             makeMusic();
             println("Just did makeMusic from case 0");
             break;
@@ -464,31 +466,19 @@ void handleCallbacks(int callbackID) {
         default:
 
             //draw_background = false;
-
-            ell_vals[0] = xpositions[callbackID][1];
-            ell_vals[1] = ypositions[callbackID][1];
-
-            ell_vals[2] = random(10)+10;
-            ell_vals[3] = random(10)+10;
-
-            int npoints = int(xpositions[callbackID][0]);
+            int time_index = callbackID-1;
+            int npoints = int(xpositions[time_index][0]);
             for (int j=1;j<npoints+1;j++)
             {
-                float x = xpositions[callbackID][j];
-                float y = ypositions[callbackID][j];
-                float t = time_steps[callbackID];
+                float x = xpositions[time_index][j];
+                float y = ypositions[time_index][j];
+                float t = time_steps[time_index];
 
                 float r = sqrt(x*x+y*y);
-                //println("r: " + r);
 
-                //fill(55,93+(5*t),93);
                 fill(155,10+r/3.0,93+r/3.0);
-                //if (t>2.0)
-                //{
-                //fill(55,93+(2*t),93);
-                //}
-                //println("In callback t/x/y: "+t+" "+x+" "+y);
-                ellipse(x, y, 3, 3);
+                println("In callback : "+callbackID+" "+t);
+                ellipse(x, y, 5, 5);
             }
 
             redraw();
@@ -510,10 +500,8 @@ void customize_filelist(DropdownList ddl) {
     ddl.captionLabel().style().marginTop = 3;
     ddl.valueLabel().style().marginTop = 3;
     // Make some drop down items
-    //String[] names = {"slow","medium","fast"};
     int nfiles = filenames.length;
     for(int i=0;i<nfiles;i++) {
-        //ddl.addItem("item "+i,i);
         ddl.addItem(filenames[i],i);
     }
     //ddl.setColorBackground(color(255,128));
@@ -528,15 +516,16 @@ void customize_filelist(DropdownList ddl) {
 // controller with name buttonA
 ///////////////////////////////////////////////////////////////////////////////
 public void Play(int theValue) {
-      println("a button event from Play: "+theValue);
-        //myColor = theValue;
+    println("a button event from Play: "+theValue);
+    //myColor = theValue;
 
-      if (selected_a_file)
-      {
+    if (selected_a_file)
+    {
         background(0);
         redraw();
 
         // Read in a line
+        /*
         String line = "DEFAULTLINE";
         try{
             line = reader.readLine();
@@ -549,19 +538,20 @@ public void Play(int theValue) {
             e.printStackTrace();
             exit();
         }
+        */
 
         process_file = true;
-      }
+    }
 }
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 public void Stop(int theValue) {
-      println("a button event from Stop: "+theValue);
-        //myColor = theValue;
+    println("a button event from Stop: "+theValue);
+    //myColor = theValue;
 
-        score.stop();
-        draw_background = true;
-        process_file = false;
+    score.stop();
+    draw_background = true;
+    process_file = false;
 }
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -620,3 +610,25 @@ String[] listFileNames(String dir) {
 ///////////////////////////////////////////////////////////////////////////////
 
 
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+private String[][] bubbleSortMulti(String[][] MultiIn, int compIdx) {  
+    String[][] temp = new String[MultiIn.length][MultiIn[0].length];  
+    boolean finished = false;  
+    while (!finished) {  
+        finished = true;  
+        for (int i = 0; i < MultiIn.length - 1; i++) {  
+            if (MultiIn[i][compIdx].compareToIgnoreCase(MultiIn[i + 1][compIdx]) > 0) {  
+                for (int j = 0; j < MultiIn[i].length; j++) {  
+                    temp[i][j] = MultiIn[i][j];  
+                    MultiIn[i][j] = MultiIn[i + 1][j];  
+                    MultiIn[i + 1][j] = temp[i][j];  
+                }  
+                finished = false;  
+            }  
+        }  
+    }  
+    return MultiIn;  
+}  
+///////////////////////////////////////////////////////////////////////////////
