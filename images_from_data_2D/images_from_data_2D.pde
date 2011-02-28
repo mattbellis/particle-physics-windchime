@@ -160,6 +160,8 @@ void setup()
     controlP5.addButton("Play",0,10, 60,50,19);
     controlP5.addButton("Stop",0,100,60,50,19);
 
+    controlP5.addSlider("Tempo",0,480,120,20,100,10,100);
+
     //makeMusic();
 
     background(0);
@@ -170,6 +172,7 @@ void setup()
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 void draw() {
+    score.tempo(tempo);
     if (process_file)
     {
         makeMusic();
@@ -631,4 +634,11 @@ private String[][] bubbleSortMulti(String[][] MultiIn, int compIdx) {
     }  
     return MultiIn;  
 }  
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+void Tempo(float value) {
+      tempo = int(value);
+      println("a slider event. setting background to "+tempo);
+}
 ///////////////////////////////////////////////////////////////////////////////
