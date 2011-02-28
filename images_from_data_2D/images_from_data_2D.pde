@@ -550,7 +550,7 @@ public void Stop(int theValue) {
     //myColor = theValue;
 
     score.stop();
-    draw_background = true;
+    //draw_background = true;
     process_file = false;
 }
 ///////////////////////////////////////////////////////////////////////////////
