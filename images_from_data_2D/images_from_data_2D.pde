@@ -9,6 +9,7 @@ import controlP5.*;
 ControlP5 controlP5;
 
 DropdownList p1, p2;
+DropdownList[] dd_sonic;
 ///////////////////////////////////////////////////////////////////////////////
 import javax.swing.JFileChooser;
 ///////////////////////////////////////////////////////////////////////////////
@@ -25,6 +26,8 @@ int index = 0;
 
 float instruments[] = {SCScore.PIANO, SCScore.ACOUSTIC_GUITAR, SCScore.CELLO, SCScore.TIMPANI, SCScore.SAXOPHONE, SCScore.FRENCH_HORN, SCScore.DOUBLE_BASS, SCScore.OCARINA};
 
+String[] sonic_labels = {"Pitch", "Duration", "Volume", "Instrument"};
+
 int musical_scale_range = 100;
 float volume_range = 100;
 float note_time_range = 60.0;
@@ -32,30 +35,46 @@ float duration_range = 10.0;
 float pitch_range = 127;
 float pan_range = 127;
 
+int sound_mapping = 0;
+
+// Data file
+// 0 - track number
+// 1 - PID
+// 2 - Charge
+// 3-6 - E,px,py,pz
+// 7 - Detector number
+// 8 - Detector time
+// 9-11 - Detector x,y,z
+// 12-14 - Detector r, costheta, phi
+
 // Set ranges on things so we can normalize them.
-// energy
-// radius
-// time
-// costheta
-// z
-int nranges = 7;
+int nranges = 15;
 float[] val_lo = new float[nranges];
 float[] val_hi = new float[nranges];
+String[] val_name = new String[nranges];
+
+// Hash for the particle values.
+HashMap pvals = new HashMap();
 
 int screen_width = 800;
 int screen_height = 800;
+int screen_depth = 800;
 
 int background_color = 0;
 int tempo = 240;
 
 float xpos;
 float ypos;
+float zpos;
 
 int num_times = 0;
 
 float[] time_steps = new float[127];
 float[][] xpositions = new float[127][500];
 float[][] ypositions = new float[127][500];
+float[][] zpositions = new float[127][500];
+float[][] colors = new float[127][500];
+float[][] sizes = new float[127][500];
 
 int num_sound_events = 0;
 
@@ -104,31 +123,60 @@ void setup()
     frameRate(10);
     smooth();
 
-    // Energy range
-    val_lo[0] = 0.0; val_hi[0] = 1.2;
-    // radius range
-    val_lo[1] = 0.0; val_hi[1] = 3.0;
-    // Time range
-    val_lo[2] = 0.0; val_hi[2] = 30.0;
-    // costheta range
-    val_lo[3] = -1.0; val_hi[3] =  1.0;
-    // x range
-    val_lo[4] = -2.5; val_hi[4] =  2.5;
-    // y range
-    val_lo[5] = -2.5; val_hi[5] =  2.5;
-    // z range
-    val_lo[6] = -2.5; val_hi[6] =  2.5;
+    // Hash table
+    pvals.put("tracknum",new MyInt(0));
+    pvals.put("pid", new MyInt(1));
+    pvals.put("q", new MyInt(2));
+    pvals.put("E", new MyInt(3));
+    pvals.put("px", new MyInt(4));
+    pvals.put("py", new MyInt(5));
+    pvals.put("pz", new MyInt(6));
+    pvals.put("dnum", new MyInt(7));
+    pvals.put("dtime", new MyInt(8));
+    pvals.put("dx", new MyInt(9));
+    pvals.put("dy", new MyInt(10));
+    pvals.put("dz", new MyInt(11));
+    pvals.put("dr", new MyInt(12));
+    pvals.put("dcostheta", new MyInt(13));
+    pvals.put("dphi", new MyInt(14));
+
+    // Names of values
+    val_name[0] = "Track #";
+    val_name[1] = "PID";
+    val_name[2] = "Charge";
+    val_name[3] = "E";
+    val_name[4] = "px";
+    val_name[5] = "py";
+    val_name[6] = "pz";
+    val_name[7] = "Detector number";
+    val_name[8] = "Detector time";
+    val_name[9] = "Detector x";
+    val_name[10] = "Detector y";
+    val_name[11] = "Detector z";
+    val_name[12] = "Detector r";
+    val_name[13] = "Detector cos(theta)";
+    val_name[14] = "Detector phi";
+
+    // Ranges for values to read in from data file.
+    val_lo[0] = 0.0; val_hi[0] = 30.0; // Track number (this might have to be made bigger for other experiments.
+    val_lo[1] = 0.0; val_hi[1] = 5.0; // PID, photon,electron,muon,pion,kaon,proton
+    val_lo[2] = -1.0; val_hi[2] = 1.0; // Charge
+    val_lo[3] = 0.0; val_hi[3] = 1.5; // Energy
+    val_lo[4] = 0.0; val_hi[4] = 1.0; // px
+    val_lo[5] = 0.0; val_hi[5] = 1.0; // py
+    val_lo[6] = 0.0; val_hi[6] = 1.0; // pz
+    val_lo[7] = 0.0; val_hi[7] = 1.0; // Detector number
+    val_lo[8] = 0.0; val_hi[8] = 30.0; // Detector time
+    val_lo[9] = -2.5; val_hi[9] =  2.5; // x range
+    val_lo[10] = -2.5; val_hi[10] =  2.5; // y range
+    val_lo[11] = -2.5; val_hi[11] =  2.5; // z range
+    val_lo[12] = 0.0; val_hi[12] = 3.0; // radius range
+    val_lo[13] = -1.0; val_hi[13] =  1.0; // costheta range
+    val_lo[14] = -1.0; val_hi[14] =  1.0; // phi range
 
     ////////////////////////////////////////////////////////////////////
-    // Read in a file
+    // Set up the score.
     ////////////////////////////////////////////////////////////////////
-    //lines = loadStrings("events_1237_10.txt");
-    //lines = loadStrings("events_3429_10.txt");
-    //lines = loadStrings("events_mupmum_CM_10.txt");
-    //lines = loadStrings("events_bbbar_CM_1.txt");
-    //lines = loadStrings("events_3429_1.txt");
-
-
     score = new SCScore();
     score.addCallbackListener(this);
     score.tempo(tempo);
@@ -156,11 +204,22 @@ void setup()
     controlP5.setAutoDraw(false);
     p1 = controlP5.addDropdownList("myList-p1",screen_width-300,80,120,120);
     customize_filelist(p1);
+    p2 = controlP5.addDropdownList("myList-p2",300,80,120,120);
+    customize_mapping(p2);
+    //dd_sonic_0 = controlP5.addDropdownList("dd_sonic_0",10,100,80,80);
+    //customize_dd_sonic(dd_sonic_0,0);
+    dd_sonic = new DropdownList[4];
+    for (int i=0;i<4;i++)
+    {
+        String name = "dd_sonic_" + i;
+        dd_sonic[i] = controlP5.addDropdownList(name,10,100 + 20*i,80,80);
+        customize_dd_sonic(dd_sonic[i],i);
+    }
 
     controlP5.addButton("Play",0,10, 60,50,19);
     controlP5.addButton("Stop",0,100,60,50,19);
 
-    controlP5.addSlider("Tempo",0,480,120,20,100,10,100);
+    controlP5.addSlider("Tempo",0,480,120,20,screen_height-140,10,100);
 
     //makeMusic();
 
@@ -194,6 +253,14 @@ void makeMusic()
     fill(255,193,193);
     if (process_file)
     {
+        float pitch = 0.0;
+        float volume = 0.0;
+        int channel = 0;
+        double instrument = 0.0;
+        double articulation = 0.0; // 0.2 is stacatto, 1.0 is legato
+        double pan = 64.0;
+        double duration = 0.0;
+        
         process_file = false;
         println("Just inside of process_file");
         score.empty();
@@ -221,6 +288,9 @@ void makeMusic()
             {
                 xpositions[i][j] = 0.0;
                 ypositions[i][j] = 0.0;
+                zpositions[i][j] = 0.0;
+                sizes[i][j] = 0.0;
+                colors[i][j] = 0.0;
             }
         }
         ///////////////////////////////////////////////////////////////////////////
@@ -261,47 +331,63 @@ void makeMusic()
 
             if (vals.length>1)
             {
-                float energy = float(vals[3]);
-                float time = float(vals[8]);
-                float radius = float(vals[12]);
-                int pid = int(vals[1]);
-                int detector = int(vals[7]);
-                float costheta = float(vals[13]);
-                float x = float(vals[9]);
-                float y = float(vals[10]);
-                float z = float(vals[11]);
+                float[] norm_vals = new float[nranges];
+                
+                for (int j=0;j<nranges;j++)
+                {
+                    norm_vals[j] = (float(vals[j]) - val_lo[j])/(val_hi[j] - val_lo[j]);
+                }
 
                 // Normalize the energy
-                energy = ((energy-val_lo[0])/(val_hi[0]-val_lo[0]));
-                //println("energy: " + energy);
-
-                // Normalize the time
-                time = ((time-val_lo[2])/(val_hi[2]-val_lo[2]));
-                //println("time: " + time);
-
-                // Normalize the radius
-                radius = ((radius-val_lo[1])/(val_hi[1]-val_lo[1]));
-                //println("radius: " + radius);
-
-                // Normalize the costheta
-                costheta = ((costheta-val_lo[3])/(val_hi[3]-val_lo[3]));
-
-                // Normalize the x,y,z
-                x = ((x-val_lo[4])/(val_hi[4]-val_lo[4]));
-                y = ((y-val_lo[5])/(val_hi[5]-val_lo[5]));
-                z = ((z-val_lo[6])/(val_hi[6]-val_lo[6]));
+                MyInt ii = (MyInt)pvals.get("E");
+                //println("energy: " + (int)ii.getVal() + " " + norm_vals[((MyInt)pvals.get("E")).getVal()]);
+                ///*
+                float energy = norm_vals[((MyInt)pvals.get("E")).getVal()];
+                float time = norm_vals[((MyInt)pvals.get("dtime")).getVal()];
+                float radius = norm_vals[((MyInt)pvals.get("dr")).getVal()];
+                float costheta = norm_vals[((MyInt)pvals.get("dcostheta")).getVal()];
+                float x = norm_vals[((MyInt)pvals.get("dx")).getVal()];
+                float y = norm_vals[((MyInt)pvals.get("dy")).getVal()];
+                float z = norm_vals[((MyInt)pvals.get("dz")).getVal()];
+                int detector = int(norm_vals[((MyInt)pvals.get("dnum")).getVal()]);
+                int pid = int(norm_vals[((MyInt)pvals.get("pid")).getVal()]);
+                float px = norm_vals[((MyInt)pvals.get("px")).getVal()];
+                float py = norm_vals[((MyInt)pvals.get("py")).getVal()];
+                float pz = norm_vals[((MyInt)pvals.get("pz")).getVal()];
+                float pmag = sqrt(px*px + py*py + pz*pz);
+                //*/
 
                 xpos = screen_width*x;
                 ypos = screen_height*y;
+                zpos = screen_depth*z;
 
                 ////////////////////////////////////////////////////////////////////
                 // Map onto the sonic characteristics.
                 ////////////////////////////////////////////////////////////////////
-                //float pitch = pitch_range*radius + 40 + costheta*10;
-                float pitch = pitch_range*(radius/2.0) + z*40 + 20;
-                //float pitch = energy;
+                if (sound_mapping==0)
+                {
+                    pitch = pitch_range*(radius/2.0) + z*40 + 20;
+                }
+                else if (sound_mapping==1)
+                {
+                    pitch = pitch_range*(costheta);
+                }
+                else if (sound_mapping==2)
+                {
+                    pitch = pitch_range*(costheta/4.0) + 40;
+                }
+                else if (sound_mapping==3)
+                {
+                    pitch = pitch_range*energy;
+                    //println("pitch: " + pitch + " " + pitch_range + " " + energy);
+                }
+                else if (sound_mapping==4)
+                {
+                    pitch = pitch_range*pmag;
+                    println("pitch: " + pitch + " " + pitch_range + " " + pmag);
+                }
 
-                float volume = volume_range*energy;
+                volume = volume_range*energy;
                 //println("volume: " + volume);
                 note_time = note_time_range*time;
                 if (max_note_time<note_time)
@@ -310,9 +396,8 @@ void makeMusic()
                 }
                 //float volume = 30.0*radius;
 
-                int channel = 1;
+                channel = 1;
 
-                double instrument = 0.0;
                 if (detector>=0 && detector<20)
                 {
                     instrument = instruments[0];
@@ -324,25 +409,9 @@ void makeMusic()
                     channel = 4;
                 }
 
-                //note_time = int(note_time);
-
-                //println("i detector/instrument/note_time/pitch: " + i + " " + detector + " " + instrument + " " + note_time + " " + pitch);
-                //println("i note_time/pitch: " + i + " " + note_time + " " + pitch);
-
-                //instrument = instruments[pid];
-                //channel = pid+1;
-
-                //double articulation = 0.2; // Stacatto
-                double articulation = 1.0; // Legato
-
-                //double pan = 64.0;
-                //println(i);
-                //double pan = 50 * (i%2);
-                //double pan = pan_range*costheta;
-                double pan = pan_range*z;
-                //println(pan);
-                //double duration = energy/20.0;
-                double duration = 5.0;
+                articulation = 1.0;
+                pan = pan_range*z;
+                duration = 5.0;
 
                 ///////////////////////////////////////////////////////////////////
                 boolean found_time = false;
@@ -355,8 +424,12 @@ void makeMusic()
                         int npos = int(xpositions[j][0]);
                         xpositions[j][npos] = xpos;
                         ypositions[j][npos] = ypos;
+                        zpositions[j][npos] = zpos;
+                        sizes[j][npos] = detector;
                         xpositions[j][0]++;
                         ypositions[j][0]++;
+                        zpositions[j][0]++;
+                        sizes[j][0]++;
                         found_time = true;
                     }
                 }
@@ -366,8 +439,12 @@ void makeMusic()
                     time_steps[num_times] = note_time;
                     xpositions[num_times][1] = xpos;
                     ypositions[num_times][1] = ypos;
+                    zpositions[num_times][1] = zpos;
+                    sizes[num_times][1] = detector;
                     xpositions[num_times][0] = 1;
                     ypositions[num_times][0] = 1;
+                    zpositions[num_times][0] = 1;
+                    sizes[num_times][0] = 1;
                     num_times++;
                     if (num_times>=127)
                     {
@@ -387,7 +464,7 @@ void makeMusic()
                 if (!found_time)
                 {
                     score.addCallback(note_time, callbackID);
-                    println("callbackID: " + callbackID + " " + note_time);
+                    //println("callbackID: " + callbackID + " " + note_time);
                     callbackID++;
                 }
                 // The integer here (callbackID) has to be less than 256!
@@ -478,10 +555,15 @@ void handleCallbacks(int callbackID) {
                 float t = time_steps[time_index];
 
                 float r = sqrt(x*x+y*y);
+                float size = 1.0;
+                //println("sizes: " + sizes[time_index][j]);
+                if (sizes[time_index][j]<20) { size = 5.0; }
+                else if (sizes[time_index][j]>=20) { size = 20.0; }
 
                 fill(155,10+r/3.0,93+r/3.0);
-                println("In callback : "+callbackID+" "+t);
-                ellipse(x, y, 5, 5);
+                //println("In callback : "+callbackID+" "+t);
+                //ellipse(x, y, 5, 5);
+                ellipse(x, y, size, size);
             }
 
             redraw();
@@ -514,6 +596,42 @@ void customize_filelist(DropdownList ddl) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+void customize_mapping(DropdownList ddl) {
+    ddl.setItemHeight(15);
+    ddl.setBarHeight(15);
+    ddl.setWidth(120);
+    ddl.captionLabel().set("Choose a mapping");
+    ddl.captionLabel().style().marginTop = 3;
+    ddl.valueLabel().style().marginTop = 3;
+    // Make some drop down items
+    int num_mappings = 5;
+    for(int i=0;i<num_mappings;i++) {
+        String name = "Mapping " + i;
+        ddl.addItem(name,i);
+    }
+    ddl.setColorActive(color(0,0,255,128));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+void customize_dd_sonic(DropdownList ddl, int index) {
+    ddl.setItemHeight(15);
+    ddl.setHeight(400);
+    ddl.setBarHeight(15);
+    ddl.setWidth(120);
+    ddl.captionLabel().set(sonic_labels[index] + ": ");
+    ddl.captionLabel().style().marginTop = 3;
+    ddl.valueLabel().style().marginTop = 3;
+    // Make some drop down items
+    for(int i=0;i<nranges;i++) {
+        String name = val_name[i];
+        ddl.addItem(name,i);
+    }
+    ddl.setColorActive(color(0,0,255,128));
+}
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////////////////
 // function buttonA will receive changes from 
 // controller with name buttonA
@@ -521,28 +639,10 @@ void customize_filelist(DropdownList ddl) {
 public void Play(int theValue) {
     println("a button event from Play: "+theValue);
     //myColor = theValue;
-
     if (selected_a_file)
     {
         background(0);
         redraw();
-
-        // Read in a line
-        /*
-        String line = "DEFAULTLINE";
-        try{
-            line = reader.readLine();
-            //println(line);
-            num_sound_events = int(line);
-            println("num_sound_events: " + num_sound_events);
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            exit();
-        }
-        */
-
         process_file = true;
     }
 }
@@ -568,30 +668,48 @@ void controlEvent(ControlEvent theEvent)
     // therefore you need to check the originator of the Event with
     // if (theEvent.isGroup())
     // to avoid an error message from controlP5.
+    String event_name = theEvent.name();
 
     if (theEvent.isGroup()) {
         // check if the Event was triggered from a ControlGroup
         println(theEvent.group().value()+" from "+theEvent.group());
         println("CLICKED");
         println(theEvent.group());
-        println(theEvent.name());
+        println(event_name);
     } else if(theEvent.isController()) {
         println(theEvent.controller().value()+" from "+theEvent.controller());
     }
 
-    if (theEvent.name() == "myList-p1")
+    if (event_name == "myList-p1")
     {
         int index = int(theEvent.group().value());
         infile = filenames[index];
         reader = createReader(infile);
         //process_file = true;
         selected_a_file = true;
-
-
-        //score.stop();
-        //lines = loadStrings(infile);
     }
-    //makeMusic();
+    else if (event_name == "myList-p2")
+    {
+        int index = int(theEvent.group().value());
+        sound_mapping = index;
+    }
+    else if (event_name.charAt(0)=='d' && event_name.charAt(1)=='d' &&
+            event_name.charAt(3)=='s')
+    {
+        int dd_index = 0;
+        char tc = event_name.charAt(9);
+        if (tc=='0') dd_index=0;
+        else if (tc=='1') dd_index=1;
+        else if (tc=='2') dd_index=2;
+        else if (tc=='3') dd_index=3;
+
+        println("dd_index: " + dd_index + " " + event_name.charAt(9));
+        int index = int(theEvent.group().value());
+        String name = sonic_labels[dd_index] + ": " + val_name[index];
+        //dd_sonic_0.captionLabel().set(name);
+        dd_sonic[dd_index].captionLabel().set(name);
+    }
+    
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -642,3 +760,23 @@ void Tempo(float value) {
       println("a slider event. setting background to "+tempo);
 }
 ///////////////////////////////////////////////////////////////////////////////
+
+class MyInt {
+
+    int val;
+
+    MyInt(int i)
+    {
+        val = i;
+    }
+
+    void setVal(int i)
+    {
+        val = i;
+    }
+
+    int getVal()
+    {
+        return val;
+    }
+}
