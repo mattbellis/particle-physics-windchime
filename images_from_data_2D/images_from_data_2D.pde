@@ -162,9 +162,9 @@ void setup()
     val_lo[1] = 0.0; val_hi[1] = 5.0; // PID, photon,electron,muon,pion,kaon,proton
     val_lo[2] = -1.0; val_hi[2] = 1.0; // Charge
     val_lo[3] = 0.0; val_hi[3] = 1.5; // Energy
-    val_lo[4] = 0.0; val_hi[4] = 1.0; // px
-    val_lo[5] = 0.0; val_hi[5] = 1.0; // py
-    val_lo[6] = 0.0; val_hi[6] = 1.0; // pz
+    val_lo[4] = -2.5; val_hi[4] = 2.5; // px
+    val_lo[5] = -2.5; val_hi[5] = 2.5; // py
+    val_lo[6] = -2.5; val_hi[6] = 2.5; // pz
     val_lo[7] = 0.0; val_hi[7] = 1.0; // Detector number
     val_lo[8] = 0.0; val_hi[8] = 30.0; // Detector time
     val_lo[9] = -2.5; val_hi[9] =  2.5; // x range
@@ -202,9 +202,9 @@ void setup()
 
     controlP5 = new ControlP5(this);
     controlP5.setAutoDraw(false);
-    p1 = controlP5.addDropdownList("myList-p1",screen_width-300,80,120,120);
+    p1 = controlP5.addDropdownList("myList-p1",240,45,120,120);
     customize_filelist(p1);
-    p2 = controlP5.addDropdownList("myList-p2",300,80,120,120);
+    p2 = controlP5.addDropdownList("myList-p2",500,45,120,120);
     customize_mapping(p2);
     //dd_sonic_0 = controlP5.addDropdownList("dd_sonic_0",10,100,80,80);
     //customize_dd_sonic(dd_sonic_0,0);
@@ -212,12 +212,13 @@ void setup()
     for (int i=0;i<4;i++)
     {
         String name = "dd_sonic_" + i;
-        dd_sonic[i] = controlP5.addDropdownList(name,10,100 + 20*i,80,80);
+        dd_sonic[i] = controlP5.addDropdownList(name,10,80+20*i,80,80);
         customize_dd_sonic(dd_sonic[i],i);
     }
 
-    controlP5.addButton("Play",0,10, 60,50,19);
-    controlP5.addButton("Stop",0,100,60,50,19);
+    controlP5.addButton("Play",0,10,30,50,19);
+    controlP5.addButton("Stop",0,80,30,50,19);
+    controlP5.addButton("Pause",0,150,30,50,19);
 
     controlP5.addSlider("Tempo",0,480,120,20,screen_height-140,10,100);
 
@@ -384,6 +385,11 @@ void makeMusic()
                 else if (sound_mapping==4)
                 {
                     pitch = pitch_range*pmag;
+                    println("pitch: " + pitch + " " + pitch_range + " " + pmag);
+                }
+                else if (sound_mapping==5)
+                {
+                    pitch = pitch_range* (1.0 - exp(-0.5*pmag));
                     println("pitch: " + pitch + " " + pitch_range + " " + pmag);
                 }
 
@@ -579,7 +585,7 @@ void customize_filelist(DropdownList ddl) {
     //ddl.setBackgroundColor(color(190));
     ddl.setItemHeight(15);
     ddl.setBarHeight(15);
-    //ddl.setHeight(300);
+    ddl.setHeight(300);
     ddl.setWidth(200);
     ddl.captionLabel().set("Choose a file");
     ddl.captionLabel().style().marginTop = 3;
@@ -604,7 +610,7 @@ void customize_mapping(DropdownList ddl) {
     ddl.captionLabel().style().marginTop = 3;
     ddl.valueLabel().style().marginTop = 3;
     // Make some drop down items
-    int num_mappings = 5;
+    int num_mappings = 6;
     for(int i=0;i<num_mappings;i++) {
         String name = "Mapping " + i;
         ddl.addItem(name,i);
@@ -628,6 +634,7 @@ void customize_dd_sonic(DropdownList ddl, int index) {
         ddl.addItem(name,i);
     }
     ddl.setColorActive(color(0,0,255,128));
+    ddl.setColorBackground(color(255,0,255,128));
 }
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -653,14 +660,21 @@ public void Stop(int theValue) {
     //myColor = theValue;
 
     score.stop();
+    draw_background = true;
+    process_file = false;
+}
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+public void Pause(int theValue) {
+    println("a button event from Pause: "+theValue);
+    //myColor = theValue;
+
+    score.stop();
     //draw_background = true;
     process_file = false;
 }
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-
-
-
 void controlEvent(ControlEvent theEvent) 
 {
     // PulldownMenu is if type ControlGroup.
@@ -693,6 +707,7 @@ void controlEvent(ControlEvent theEvent)
         int index = int(theEvent.group().value());
         sound_mapping = index;
     }
+    // Process the events from the dd_sonic_X dropdown menus.
     else if (event_name.charAt(0)=='d' && event_name.charAt(1)=='d' &&
             event_name.charAt(3)=='s')
     {
@@ -706,7 +721,6 @@ void controlEvent(ControlEvent theEvent)
         println("dd_index: " + dd_index + " " + event_name.charAt(9));
         int index = int(theEvent.group().value());
         String name = sonic_labels[dd_index] + ": " + val_name[index];
-        //dd_sonic_0.captionLabel().set(name);
         dd_sonic[dd_index].captionLabel().set(name);
     }
     
