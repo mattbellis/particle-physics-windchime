@@ -1,4 +1,5 @@
 /**
+  particle-physics-windchime
  */
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -23,6 +24,8 @@ float controller = 81;
 
 String[] lines;
 int index = 0;
+
+int event_count = 0;
 
 float instruments[] = {SCScore.PIANO, SCScore.ACOUSTIC_GUITAR, SCScore.CELLO, SCScore.TIMPANI, SCScore.SAXOPHONE, SCScore.FRENCH_HORN, SCScore.DOUBLE_BASS, SCScore.OCARINA};
 
@@ -220,7 +223,7 @@ void setup()
     controlP5.addButton("Stop",0,80,30,50,19);
     controlP5.addButton("Pause",0,150,30,50,19);
 
-    controlP5.addSlider("Tempo",0,480,120,20,screen_height-140,10,100);
+    controlP5.addSlider("Tempo",0,480,240,20,screen_height-140,10,100);
 
     //makeMusic();
 
@@ -389,7 +392,7 @@ void makeMusic()
                 }
                 else if (sound_mapping==5)
                 {
-                    pitch = pitch_range* (1.0 - exp(-0.5*pmag));
+                    pitch = pitch_range* (1.0 - exp(-0.7*pmag));
                     println("pitch: " + pitch + " " + pitch_range + " " + pmag);
                 }
 
@@ -484,7 +487,7 @@ void makeMusic()
         //}
 
         //note_time+=10;
-        note_time=max_note_time + 2;
+        note_time=max_note_time + 10;
         //println("ELSE note_time: " + note_time);
         score.addCallback(note_time, 0);
 
@@ -493,10 +496,15 @@ void makeMusic()
         draw_background = false;
         process_file = false;
         //background(0);
+        //String outname = "BpBm_events_mapping" + sound_mapping + "/event_" + event_count + ".mid";
+        //String outname = "tauptaum_events_mapping" + sound_mapping + "/event_" + event_count + ".mid";
+        //println("Saving as: " + outname);
+        //score.writeMidiFile(outname);
+
         score.play();
-        //score.writeMidiFile("my_test.mid");
 
         println("PLAYING!");
+        event_count++;
 
 
         //exit();
@@ -558,15 +566,35 @@ void handleCallbacks(int callbackID) {
             {
                 float x = xpositions[time_index][j];
                 float y = ypositions[time_index][j];
+                float z = zpositions[time_index][j];
                 float t = time_steps[time_index];
 
                 float r = sqrt(x*x+y*y);
                 float size = 1.0;
                 //println("sizes: " + sizes[time_index][j]);
-                if (sizes[time_index][j]<20) { size = 5.0; }
-                else if (sizes[time_index][j]>=20) { size = 20.0; }
+                // Size based on detector
+                //if (sizes[time_index][j]<20) { size = 5.0; }
+                //else if (sizes[time_index][j]>=20) { size = 20.0; }
 
-                fill(155,10+r/3.0,93+r/3.0);
+                z /= (1.0*screen_depth);
+                //z += 1.0;
+                size = 20.0*z; 
+                //println("z/size: " + z + " " + size);
+                //println("r: " + r);
+
+                // Cool color based on position
+                //fill(155,10+r/3.0,93+r/3.0);
+                // Color based on detector
+                if (sizes[time_index][j]<20) 
+                { 
+                    fill(155,210,255); 
+                }
+                else if (sizes[time_index][j]>=20) 
+                { 
+                    fill(255,255,0);
+                    size = 30.0*z;
+                }
+
                 //println("In callback : "+callbackID+" "+t);
                 //ellipse(x, y, 5, 5);
                 ellipse(x, y, size, size);
@@ -701,6 +729,7 @@ void controlEvent(ControlEvent theEvent)
         reader = createReader(infile);
         //process_file = true;
         selected_a_file = true;
+        event_count = 0;
     }
     else if (event_name == "myList-p2")
     {
@@ -722,6 +751,7 @@ void controlEvent(ControlEvent theEvent)
         int index = int(theEvent.group().value());
         String name = sonic_labels[dd_index] + ": " + val_name[index];
         dd_sonic[dd_index].captionLabel().set(name);
+        event_count = 0;
     }
     
 }
