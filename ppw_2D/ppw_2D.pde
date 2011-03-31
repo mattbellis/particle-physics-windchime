@@ -192,10 +192,10 @@ void setup()
     // Path
     String path = dataPath("");
     println("Listing all filenames in a directory: ");
-    //println(path);
+    
     String[] temp_filenames = listFileNames(path);
     int nfiles = temp_filenames.length;
-    //println(temp_filenames);
+    
     int j = 0;
     for (int i=0;i<nfiles;i++)
     {
@@ -206,7 +206,7 @@ void setup()
             j++;
         }
     }
-    //println(filenames);
+    
 
     controlP5 = new ControlP5(this);
     controlP5.setAutoDraw(false);
