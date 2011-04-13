@@ -455,6 +455,12 @@ void makeMusic()
                 ////////////////////////////////////////////////////////////////////
                 // Map onto the sonic characteristics.
                 ////////////////////////////////////////////////////////////////////
+
+                //volume = volume_range*energy;
+                //println(pmag);
+                volume = volume_range*(pmag-0.8)*9.0;
+                println("pmag/volume: " + pmag + " " + volume);
+
                 if (sound_mapping==0)
                 {
                     pitch = pitch_range*(radius/2.0) + z*40 + 20;
@@ -475,7 +481,8 @@ void makeMusic()
                 }
                 else if (sound_mapping==4)
                 {
-                    pitch = pitch_range*pmag;
+                    //pitch = pitch_range*pmag;
+                    pitch = pitch_range*(pmag-0.80)*6.0;
                     println("pitch: " + pitch + " " + pitch_range + " " + pmag);
                 }
                 else if (sound_mapping==5)
@@ -484,7 +491,6 @@ void makeMusic()
                     println("pitch: " + pitch + " " + pitch_range + " " + pmag);
                 }
 
-                volume = volume_range*energy;
                 //println("volume: " + volume);
                 note_time = note_time_range*time;
                 if (max_note_time<note_time)
@@ -556,7 +562,7 @@ void makeMusic()
 
                 //pitch += random(30);
                 //pitch = 60;
-                volume = 100;
+                //volume = 100;
                 //println(note_time + " " + channel + " " + instrument + " " + pitch + " " + volume + " " + duration + " " + articulation + " " + pan);
                 score.addNote(note_time, channel, instrument, pitch, volume, duration, articulation, pan);
                 //int id = i+1;
@@ -643,7 +649,7 @@ void handleCallbacks(int callbackID) {
             //draw_background = false;
             int time_index = callbackID-1;
             int npoints = int(xpositions[time_index][0]);
-            for (int j=1;j<npoints;j++)
+            for (int j=1;j<npoints+1;j++)
             {
                 positions[nitems][0] = xpositions[time_index][j];
                 positions[nitems][1] = ypositions[time_index][j];
