@@ -11,6 +11,7 @@ ControlP5 controlP5;
 
 DropdownList p1, p2;
 DropdownList[] dd_sonic;
+CheckBox checkbox;
 ///////////////////////////////////////////////////////////////////////////////
 import javax.swing.JFileChooser;
 ///////////////////////////////////////////////////////////////////////////////
@@ -103,6 +104,8 @@ String infile;
 boolean process_file = false;
 boolean draw_background = true;
 boolean selected_a_file = false;
+boolean set_volume_to_0 = false;
+boolean dont_show_graphics = false;
 
 PeasyCam cam;
 PMatrix3D currCameraMatrix;
@@ -212,7 +215,9 @@ void setup()
     score.addCallbackListener(this);
     score.tempo(tempo);
 
+    ///////////////////////////////////////////////////////////////////////////
     // Path
+    ///////////////////////////////////////////////////////////////////////////
     String path = dataPath("");
     println("Listing all filenames in a directory: ");
     //println(path);
@@ -231,6 +236,9 @@ void setup()
     }
     //println(filenames);
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Draw all the GUI stuff. 
+    ///////////////////////////////////////////////////////////////////////////
     controlP5 = new ControlP5(this);
     controlP5.setAutoDraw(false);
     p1 = controlP5.addDropdownList("myList-p1",240,45,120,120);
@@ -250,6 +258,12 @@ void setup()
     controlP5.addButton("Play",0,10,30,50,19);
     controlP5.addButton("Stop",0,80,30,50,19);
     controlP5.addButton("Pause",0,150,30,50,19);
+
+    // Mute or blind
+    //controlP5.addButton("Mute",0,650,30,50,19);
+    checkbox = controlP5.addCheckBox("checkBox",650,30);  
+    checkbox.addItem("Mute",0);
+    checkbox.addItem("Blind",1);
 
     controlP5.addSlider("Tempo",0,480,tempo,20,screen_height-140,10,100);
 
@@ -273,7 +287,10 @@ void draw() {
         makeMusic();
     }
 
-    background(0);
+    if (draw_background)
+    {
+        background(0);
+    }
     //lights();
 
     // Set up some different colored lights
@@ -295,6 +312,8 @@ void draw() {
         pushMatrix();
         //println("pos: " + positions[i][0] + " " + positions[i][1] + " " + positions[i][2]);
         translate(positions[i][0],positions[i][1],positions[i][2]);
+        if (!dont_show_graphics)
+        {
         if (detector_flag[i]==0)
         {
             sphereDetail(6);
@@ -303,6 +322,7 @@ void draw() {
         else if (detector_flag[i]==1)
         {
             box(20);
+        }
         }
         popMatrix();
     }
@@ -353,21 +373,21 @@ void makeMusic()
         boolean found_start_of_event = false;
         while (!found_start_of_event)
         {
-        try{
-            line = reader.readLine();
-            println(line);
-            num_sound_events = int(line);
-            println("num_sound_events: " + num_sound_events);
-            if (num_sound_events>0)
-            {   
-                found_start_of_event = true;
+            try{
+                line = reader.readLine();
+                println(line);
+                num_sound_events = int(line);
+                println("num_sound_events: " + num_sound_events);
+                if (num_sound_events>0)
+                {   
+                    found_start_of_event = true;
+                }
             }
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            exit();
-        }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+                exit();
+            }
         }
 
 
@@ -397,18 +417,12 @@ void makeMusic()
 
         int count = 0;
 
-
-        //int nentries = int(vals[0]);
-        //println("nentries: " + nentries);
-
-        //int max = nentries;
-        //max = 125;
-        //max = 300;
         int callbackID = 1;
         for (int i = 0; i < num_sound_events; i++) 
         {
             // Read in a line
-            try{
+            try
+            {
                 line = reader.readLine();
             }
             catch (Exception e)
@@ -416,7 +430,6 @@ void makeMusic()
                 e.printStackTrace();
             }
 
-            //line = reader.readLine();
             String[] vals = split(line, ' ');
             //println(vals);
 
@@ -451,6 +464,8 @@ void makeMusic()
                 xpos = screen_width*x;
                 ypos = screen_height*y;
                 zpos = screen_depth*z;
+
+                //println("xyz: "+xpos+" "+ypos+" "+zpos);
 
                 ////////////////////////////////////////////////////////////////////
                 // Map onto the sonic characteristics.
@@ -528,7 +543,7 @@ void makeMusic()
                     if (time_steps[j] == note_time)
                     {
                         //println(note_time);
-                        int npos = int(xpositions[j][0]);
+                        int npos = int(xpositions[j][0])+1;
                         xpositions[j][npos] = xpos;
                         ypositions[j][npos] = ypos;
                         zpositions[j][npos] = zpos;
@@ -559,15 +574,9 @@ void makeMusic()
                     }
                 }
                 ///////////////////////////////////////////////////////////////////
-
-                //pitch += random(30);
-                //pitch = 60;
-                //volume = 100;
                 //println(note_time + " " + channel + " " + instrument + " " + pitch + " " + volume + " " + duration + " " + articulation + " " + pan);
+                if (set_volume_to_0) { volume = 0; }
                 score.addNote(note_time, channel, instrument, pitch, volume, duration, articulation, pan);
-                //int id = i+1;
-                //id = id%200 + 1;
-                //score.addCallback(note_time, id);
                 // callbackID seems to need to be less than 127!!!! ???
                 if (!found_time)
                 {
@@ -580,11 +589,6 @@ void makeMusic()
             }
         }
 
-        //for (int j=0;j<num_times;j++)
-        //{
-        //println("time_steps/xpositions: " + time_steps[j] + " " + xpositions[j][0]);
-        //}
-
         //note_time+=10;
         note_time=max_note_time + 10;
         //println("ELSE note_time: " + note_time);
@@ -592,7 +596,7 @@ void makeMusic()
 
         println("Playing something!!!!!!!!!! --------------------- ");
 
-        draw_background = false;
+        //draw_background = false;
         process_file = false;
         //background(0);
         //String outname = "BpBm_events_mapping" + sound_mapping + "/event_" + event_count + ".mid";
@@ -604,11 +608,6 @@ void makeMusic()
 
         println("PLAYING!");
         event_count++;
-
-
-        //exit();
-
-        // Set up for a new event/score.
 
     }
 }
@@ -655,6 +654,7 @@ void handleCallbacks(int callbackID) {
                 positions[nitems][1] = ypositions[time_index][j];
                 positions[nitems][2] = zpositions[time_index][j];
                 float t = time_steps[time_index];
+                //println("post xyz: "+positions[nitems][0]+" "+positions[nitems][1]+" "+positions[nitems][2]);
 
                 if (sizes[time_index][j]<20) 
                 { 
@@ -747,12 +747,14 @@ void customize_dd_sonic(DropdownList ddl, int index) {
 ///////////////////////////////////////////////////////////////////////////////
 public void Play(int theValue) {
     println("a button event from Play: "+theValue);
+    draw_background = true;
     //myColor = theValue;
     if (selected_a_file)
     {
         background(0);
         redraw();
         process_file = true;
+        //draw_background = true;
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -774,8 +776,15 @@ public void Pause(int theValue) {
 
     nitems=0;
     score.stop();
-    //draw_background = true;
+    draw_background = false;
     process_file = false;
+}
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+public void Mute(int theValue) {
+    println("a button event from Mute: "+theValue);
+
+    set_volume_to_0 = true;
 }
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -813,6 +822,18 @@ void controlEvent(ControlEvent theEvent)
         int index = int(theEvent.group().value());
         sound_mapping = index;
     }
+    else if (event_name == "checkBox")
+    {
+        //int index = int(theEvent.group().value());
+        int mute_flag = int(theEvent.group().arrayValue()[0]);
+        int blind_flag = int(theEvent.group().arrayValue()[1]);
+        println("mute_flag: "+mute_flag);
+        println("blind_flag: "+blind_flag);
+        if (mute_flag==1) { set_volume_to_0 = true; }
+        else if (mute_flag==0) { set_volume_to_0 = false; }
+        if (blind_flag==1) { dont_show_graphics = true; }
+        else if (blind_flag==0) { dont_show_graphics = false; }
+    }
     // Process the events from the dd_sonic_X dropdown menus.
     else if (event_name.charAt(0)=='d' && event_name.charAt(1)=='d' &&
             event_name.charAt(3)=='s')
@@ -834,8 +855,35 @@ void controlEvent(ControlEvent theEvent)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
 ///////////////////////////////////////////////////////////////////////////////
+/*
+void keyPressed() {
+    println(char(1)+" / "+keyCode);
+    if(key==' '){
+        checkbox.deactivateAll();
+    } else {
+        for(int i=0;i<6;i++) {
+            // check if key 0-5 have been pressed and toggle
+            // the checkbox item accordingly.
+            if(keyCode==(48 + i)) { 
+                // the index of checkbox items start at 0
+                checkbox.toggle(i);
+                println("toggle "+checkbox.getItem(i).name());
+                // also see 
+                // checkbox.activate(index);
+                // checkbox.deactivate(index);
+            }
+            if (keyCode==0)
+            {
+                set_volume_to_0 = true;
+            }
+        }
+    }
+}
+*/
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////////////////
 // This function returns all the files in a directory as an array of Strings
 ///////////////////////////////////////////////////////////////////////////////
