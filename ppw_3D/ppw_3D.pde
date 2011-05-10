@@ -2,6 +2,9 @@
   particle-physics-windchime
  */
 
+int num_physics = 7;
+String[] physics_processes = new String[num_physics];
+
 ///////////////////////////////////////////////////////////////////////////////
 // GUI stuff
 ///////////////////////////////////////////////////////////////////////////////
@@ -10,8 +13,32 @@ import controlP5.*;
 ControlP5 controlP5;
 
 DropdownList p1, p2;
+MultiList cp5_multilist_files;
+
+Matrix cp5_matrix_sonic;
+int[] sonic_index = new int[4];
+int sonic_map_index = -1;
+
+Button cp5_button_play;
+Button cp5_button_stop;
+Button cp5_button_pause;
+
+Textlabel[] cp5_tl_sonic_x = new Textlabel[20];
+Textlabel[] cp5_tl_sonic_y = new Textlabel[20];
+
+Button[] cp5_b_pick_physics = new Button[num_physics];
+int button_color_on = 120;
+int button_color_off = color(255,120,100);
+
+RadioButton cp5_rb_pick_physics;
+
 DropdownList[] dd_sonic;
 CheckBox checkbox;
+Toggle cp5_toggle_mute;
+Toggle cp5_toggle_blind;
+
+ControlWindow controlWindow;
+
 ///////////////////////////////////////////////////////////////////////////////
 import javax.swing.JFileChooser;
 ///////////////////////////////////////////////////////////////////////////////
@@ -46,6 +73,7 @@ float pitch_range = 127;
 float pan_range = 127;
 
 int sound_mapping = 0;
+int event_time = 0;
 
 // Data file
 // 0 - track number
@@ -74,6 +102,10 @@ int xcenter = screen_width/2;
 int ycenter = screen_height/2;
 int zcenter = screen_depth/2;
 
+float xcenter_f = float(xcenter);
+float ycenter_f = float(ycenter);
+float zcenter_f = float(zcenter);
+
 int background_color = 0;
 int tempo = 60;
 
@@ -98,7 +130,17 @@ int num_sound_events = 0;
 int nitems = 0;
 
 ///////////////////////////////////////////////////////////////////////////////
+// For the beam
+float[][] beam_x = new float[2][10];
+float[][] beam_y = new float[2][10];
+float[][] beam_z = new float[2][10];
+float[][] beam_z_offset = new float[2][10];
+float beam_size = 40;
+float beam_size_half = beam_size/2.0;
+boolean collision_occurred = false;
+///////////////////////////////////////////////////////////////////////////////
 String[] filenames = new String[0];
+String[] pick_filenames = new String[0];
 String infile;
 
 boolean process_file = false;
@@ -209,6 +251,28 @@ void setup()
     val_lo[14] = -1.0; val_hi[14] =  1.0; // phi range
 
     ////////////////////////////////////////////////////////////////////
+    // Physics processes
+    ////////////////////////////////////////////////////////////////////
+    physics_processes[0] = "e+e-";
+    physics_processes[1] = "mu+mu-";
+    physics_processes[2] = "tau+tau-";
+    physics_processes[3] = "uds";
+    physics_processes[4] = "ccbar";
+    physics_processes[5] = "B+B-";
+    physics_processes[6] = "B0B0bar";
+
+    pick_filenames = append(pick_filenames, "events_e+e-_100.txt");
+    pick_filenames = append(pick_filenames, "events_mu+mu-_100.txt");
+    pick_filenames = append(pick_filenames, "events_tau+tau-_100.txt");
+    pick_filenames = append(pick_filenames, "events_uubar_ddbar_ssbar_100.txt");
+    pick_filenames = append(pick_filenames, "events_ccbar_100.txt");
+    pick_filenames = append(pick_filenames, "events_B+B-_100.txt");
+    pick_filenames = append(pick_filenames, "events_B0B0bar_100.txt");
+    int len_pf = (pick_filenames.length);
+    println("pf len: " + len_pf);
+
+
+    ////////////////////////////////////////////////////////////////////
     // Set up the score.
     ////////////////////////////////////////////////////////////////////
     score = new SCScore();
@@ -224,55 +288,156 @@ void setup()
     String[] temp_filenames = listFileNames(path);
     int nfiles = temp_filenames.length;
     //println(temp_filenames);
-    int j = 0;
+    //int j = 0;
     for (int i=0;i<nfiles;i++)
     {
         if (temp_filenames[i].endsWith("txt"))
         {
             //println(temp_filenames[i]);
             filenames = append(filenames, temp_filenames[i]);
-            j++;
+            //j++;
         }
     }
     //println(filenames);
+
+    // Initialize the beam positions
+    for (int j=0;j<2;j++)
+    {
+        for (int i=0;i<10;i++)
+        {
+            beam_x[j][i] = random(beam_size) - beam_size_half + xcenter_f;
+            beam_y[j][i] = random(beam_size) - beam_size_half + ycenter_f;
+            beam_z_offset[j][i] = random(beam_size) - beam_size_half;
+        }
+    }
+
+    sonic_index[0] = -1;
+    sonic_index[1] = -1;
+    sonic_index[2] = -1;
+    sonic_index[3] = -1;
 
     ///////////////////////////////////////////////////////////////////////////
     // Draw all the GUI stuff. 
     ///////////////////////////////////////////////////////////////////////////
     controlP5 = new ControlP5(this);
     controlP5.setAutoDraw(false);
-    p1 = controlP5.addDropdownList("myList-p1",240,45,120,120);
-    customize_filelist(p1);
+
+    controlWindow = controlP5.addControlWindow("controlP5window",100,100,600,600);
+    controlWindow.hideCoordinates();
+    controlWindow.setBackground(color(40));
+    controlWindow.frameRate(15);
+
+    //p1 = controlP5.addDropdownList("myList-p1",240,45,120,120);
+    //customize_filelist(p1);
     p2 = controlP5.addDropdownList("myList-p2",500,45,120,120);
     customize_mapping(p2);
-    //dd_sonic_0 = controlP5.addDropdownList("dd_sonic_0",10,100,80,80);
-    //customize_dd_sonic(dd_sonic_0,0);
-    dd_sonic = new DropdownList[4];
-    for (int i=0;i<4;i++)
+
+    //cp5_multilist_files = controlP5.addMultiList("cp5_multilist_files",240,45,200,20);
+    //cp5_multilist_files.setWindow(controlWindow);
+    //customize_multilist_files(cp5_multilist_files);
+
+    //cp5_rb_pick_physics = controlP5.addRadioButton("radioButton",20,160);
+    //cp5_rb_pick_physics.setColorForeground(color(120));
+    //cp5_rb_pick_physics.setColorActive(color(255));
+    //cp5_rb_pick_physics.setColorLabel(color(255));
+    //cp5_rb_pick_physics.setItemsPerRow(5);
+    //cp5_rb_pick_physics.setSpacingColumn(50);
+    //customize_rb_pick_physics(cp5_rb_pick_physics);
+
+    for (int i=0;i<7;i++)
     {
-        String name = "dd_sonic_" + i;
-        dd_sonic[i] = controlP5.addDropdownList(name,10,80+20*i,80,80);
-        customize_dd_sonic(dd_sonic[i],i);
+        cp5_b_pick_physics[i] = controlP5.addButton("pick_"+physics_processes[i],i,100,100+(20*i),80,19);
+        cp5_b_pick_physics[i].setLabel(physics_processes[i]);
+        cp5_b_pick_physics[i].setColorBackground(color(button_color_off));
+        cp5_b_pick_physics[i].setColorForeground(color(120));
+        cp5_b_pick_physics[i].setColorActive(color(0));
+        cp5_b_pick_physics[i].setColorLabel(color(255));
+        cp5_b_pick_physics[i].setId(i);
+        cp5_b_pick_physics[i].setWindow(controlWindow);
     }
 
-    controlP5.addButton("Play",0,10,30,50,19);
-    controlP5.addButton("Stop",0,80,30,50,19);
-    controlP5.addButton("Pause",0,150,30,50,19);
+
+    //p1.setWindow(controlWindow);
+    //p2.setWindow(controlWindow);
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Sonic matrix
+    ///////////////////////////////////////////////////////////////////////////
+    int matrix_sonic_xpos = 300;
+    int matrix_sonic_ypos = 40;
+    int matrix_sonic_entry_width = 44;
+    int matrix_sonic_entry_height = 20;
+
+    int matrix_sonic_nx = sonic_labels.length;
+    int matrix_sonic_ny = val_name.length;
+
+    cp5_matrix_sonic = controlP5.addMatrix("matrix_sonic",matrix_sonic_nx,matrix_sonic_ny, matrix_sonic_xpos, matrix_sonic_ypos, matrix_sonic_entry_width*matrix_sonic_nx, matrix_sonic_entry_height*matrix_sonic_ny);
+    //cp5_matrix_sonic.setInterval(1000);
+    cp5_matrix_sonic.setLabel("testing");
+    cp5_matrix_sonic.setLabelVisible(true);
+    cp5_matrix_sonic.setWindow(controlWindow);
+
+    for(int i=0;i<matrix_sonic_nx;i++)
+    {
+        String mylabel = "text_label_sonic_x_"+i;
+        cp5_tl_sonic_x[i] = controlP5.addTextlabel(mylabel,sonic_labels[i],matrix_sonic_xpos+matrix_sonic_entry_width*i,matrix_sonic_ypos-10);
+        cp5_tl_sonic_x[i].setColorValue(color(255));
+        cp5_tl_sonic_x[i].setColorBackground(int(color(255,0,0)));
+        cp5_tl_sonic_x[i].setWindow(controlWindow);
+    }
+
+    for(int i=0;i<matrix_sonic_ny;i++)
+    {
+        String mylabel = "text_label_sonic_y_"+i;
+        cp5_tl_sonic_y[i] = controlP5.addTextlabel(mylabel,val_name[i],matrix_sonic_xpos+(matrix_sonic_nx*matrix_sonic_entry_width)+10,matrix_sonic_ypos+4+(i*matrix_sonic_entry_height));
+        cp5_tl_sonic_y[i].setColorBackground(color(0));
+        cp5_tl_sonic_y[i].setWindow(controlWindow);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+
+
+
+    //dd_sonic_0 = controlP5.addDropdownList("dd_sonic_0",10,100,80,80);
+    //customize_dd_sonic(dd_sonic_0,0);
+    //dd_sonic = new DropdownList[4];
+    //for (int i=0;i<4;i++)
+    //{
+    //String name = "dd_sonic_" + i;
+    //dd_sonic[i] = controlP5.addDropdownList(name,10,80+20*i,80,80);
+    //customize_dd_sonic(dd_sonic[i],i);
+    //}
+
+    cp5_button_play = controlP5.addButton("Play",0,10,30,50,19);
+    cp5_button_stop = controlP5.addButton("Stop",0,80,30,50,19);
+    cp5_button_pause = controlP5.addButton("Pause",0,150,30,50,19);
+
+    cp5_button_play.setWindow(controlWindow);
+    cp5_button_stop.setWindow(controlWindow);
+    cp5_button_pause.setWindow(controlWindow);
 
     // Mute or blind
     //controlP5.addButton("Mute",0,650,30,50,19);
-    checkbox = controlP5.addCheckBox("checkBox",650,30);  
-    checkbox.addItem("Mute",0);
-    checkbox.addItem("Blind",1);
+    //checkbox = controlP5.addCheckBox("checkBox",650,30);  
+    //checkbox.addItem("Mute",0);
+    //checkbox.addItem("Blind",1);
 
-    controlP5.addSlider("Tempo",0,480,tempo,20,screen_height-140,10,100);
+    cp5_toggle_mute = controlP5.addToggle("toggle_mute",false,20,300,10,10);
+    cp5_toggle_mute.setLabel("Mute");
+    cp5_toggle_mute.setWindow(controlWindow);
+
+    cp5_toggle_blind = controlP5.addToggle("toggle_blind",false,20,330,10,10);
+    cp5_toggle_blind.setLabel("Blind");
+    cp5_toggle_blind.setWindow(controlWindow);
+
+    Controller cp5_tempo_slider = controlP5.addSlider("Tempo",0,480,tempo,20,140,10,100);
+    cp5_tempo_slider.setWindow(controlWindow);
 
     background(0);
     controlP5.setAutoDraw(false);
 
     hint(ENABLE_NATIVE_FONTS);
-
-
 
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -305,6 +470,69 @@ void draw() {
     //ambientLight(102, 102, 102);
     ambientLight(126, 126, 126);
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Draw beams
+    ///////////////////////////////////////////////////////////////////////////
+    // Beam pipe
+    stroke(255,255,255,40);
+    line(xcenter,ycenter,20, xcenter,ycenter,screen_depth);
+    noStroke();
+
+    //if (true)
+    if (!collision_occurred)
+    {
+        fill(0,255,0);
+        //float beam_z = event_time - 500;
+        //float beam_z = event_time;
+        for (int j=0;j<2;j++)
+        {
+            if(j==0) 
+            {
+                fill(0,255,0);
+                beam_z[j][0] = event_time;
+            }
+            else 
+            {
+                beam_z[j][0] = screen_depth - event_time;
+                fill(255,0,0);
+            }
+            for (int i=0;i<5;i++)
+            {
+
+                pushMatrix();
+                translate(beam_x[j][i], beam_y[j][i], beam_z[j][0] + beam_z_offset[j][i]); // Propagate along the z-axis
+                sphere(4);
+                popMatrix();
+            }
+        }
+
+        event_time += 20;
+        if (beam_z[1][0]<=-400)
+        {
+            for (int j=0;j<2;j++)
+            {
+                for (int i=0;i<10;i++)
+                {
+                    beam_x[j][i] = random(beam_size) - beam_size_half + xcenter_f;
+                    beam_y[j][i] = random(beam_size) - beam_size_half + ycenter_f;
+                    beam_z_offset[j][i] = random(beam_size) - beam_size_half;
+                }
+            }
+            event_time = 0;
+        }
+    }
+
+    // Check to see if a collision has occurred
+    //if (abs(beam_z[1][0]-zcenter)<beam_size)
+    //{
+    //collision_occurred = true;
+    //}
+    //else
+    //{
+    //collision_occurred = false;
+    //}
+    ///////////////////////////////////////////////////////////////////////////
+
     for (int i=0;i<nitems;i++)
     {
         //fill(255,255,0);
@@ -314,18 +542,19 @@ void draw() {
         translate(positions[i][0],positions[i][1],positions[i][2]);
         if (!dont_show_graphics)
         {
-        if (detector_flag[i]==0)
-        {
-            sphereDetail(6);
-            sphere(5);
-        }
-        else if (detector_flag[i]==1)
-        {
-            box(20);
-        }
+            if (detector_flag[i]==0)
+            {
+                sphereDetail(6);
+                sphere(5);
+            }
+            else if (detector_flag[i]==1)
+            {
+                box(20);
+            }
         }
         popMatrix();
     }
+
     //controlP5.draw();
     hint(DISABLE_DEPTH_TEST);
     gui();
@@ -574,6 +803,31 @@ void makeMusic()
                     }
                 }
                 ///////////////////////////////////////////////////////////////////
+                ///////////////////////////////////////////////////////////////////
+                // Set the values based on the matrix settings.
+                ///////////////////////////////////////////////////////////////////
+                println("sonic_index: " + sonic_index[0]);
+                if(sonic_index[0]>=0)
+                {
+                    pitch = pitch_range*norm_vals[sonic_index[0]];
+                }
+                if(sonic_index[1]>=0)
+                {
+                    duration = duration_range*norm_vals[sonic_index[1]];
+                }
+                if(sonic_index[2]>=0)
+                {
+                    volume = volume_range*norm_vals[sonic_index[2]];
+                }
+                //if(sonic_index[3]>=0)
+                //{
+                //instrument = instrument_range*norm_vals[sonic_index[3]];
+                //}
+
+
+
+                ///////////////////////////////////////////////////////////////////
+                ///////////////////////////////////////////////////////////////////
                 //println(note_time + " " + channel + " " + instrument + " " + pitch + " " + volume + " " + duration + " " + articulation + " " + pan);
                 if (set_volume_to_0) { volume = 0; }
                 score.addNote(note_time, channel, instrument, pitch, volume, duration, articulation, pan);
@@ -604,7 +858,11 @@ void makeMusic()
         //println("Saving as: " + outname);
         //score.writeMidiFile(outname);
 
+        //if (collision_occurred)
+        //{
+        collision_occurred = true;
         score.play();
+        //}
 
         println("PLAYING!");
         event_count++;
@@ -639,7 +897,9 @@ void handleCallbacks(int callbackID) {
             process_file = true;
             draw_background = true;
             score.empty();
+            collision_occurred = false;
             makeMusic();
+            //collision_occurred = false;
             println("Just did makeMusic from case 0");
             break;
 
@@ -682,6 +942,37 @@ void handleCallbacks(int callbackID) {
 
 
 
+///////////////////////////////////////////////////////////////////////////////
+void customize_rb_pick_physics(RadioButton rb) {
+
+    for (int i=0;i<10;i++)
+    {
+        String theName = "rb_pick_physics" + i;
+        int theValue = i;
+        Toggle t = rb.addItem(theName,theValue);
+        t.captionLabel().setColorBackground(color(80));
+        t.captionLabel().style().movePadding(2,0,-1,2);
+        t.captionLabel().style().moveMargin(-2,0,0,-3);
+        t.captionLabel().style().backgroundWidth = 46;
+    }
+
+}
+///////////////////////////////////////////////////////////////////////////////
+void customize_multilist_files(MultiList ml) {
+    MultiListButton b;
+    b = ml.add("Choose a file",1);
+    b.setId(-2);
+
+    // Make some drop down items
+    int nfiles = filenames.length;
+    for(int i=0;i<nfiles;i++) {
+        MultiListButton c = b.add("multilist_files_button_"+i,20+i+1);
+        c.setLabel(filenames[i]);
+        c.setColorBackground(color(64 + 18*i,0,0));
+        c.setId(i);
+    }
+
+}
 ///////////////////////////////////////////////////////////////////////////////
 void customize_filelist(DropdownList ddl) {
     //ddl.setBackgroundColor(color(190));
@@ -804,8 +1095,8 @@ void controlEvent(ControlEvent theEvent)
         //println(theEvent.group());
         //println(event_name);
     } else if(theEvent.isController()) {
-        //println(theEvent.controller().value()+" from "+theEvent.controller());
-        //println(theEvent.controller().value()+" from "+theEvent.group());
+        println(theEvent.controller().id()+" from "+theEvent.controller());
+        println("b");
     }
 
     if (event_name == "myList-p1")
@@ -821,6 +1112,57 @@ void controlEvent(ControlEvent theEvent)
     {
         int index = int(theEvent.group().value());
         sound_mapping = index;
+        // Clear out the other settings
+        for (int i=0;i<4;i++)
+        {
+            cp5_matrix_sonic.set(i,sonic_index[i],false);
+            sonic_index[i] = -1;
+        }
+        //sonic_index = -1;
+        //sonic_map_index = -1;
+    }
+    //else if (event_name == "multilist_files_button")
+    else if (event_name.charAt(0)=='p' && event_name.charAt(1)=='i' &&
+            event_name.charAt(2)=='c' && event_name.charAt(3)=='k'
+            )
+    {
+        println("Here is a pick" + event_name);
+        int index = int(theEvent.controller().id());
+        println("b index: " + index);
+        if (index>=0)
+        {
+            infile = pick_filenames[index];
+            reader = createReader(infile);
+            //process_file = true;
+            selected_a_file = true;
+            event_count = 0;
+        }
+        for (int i=0;i<num_physics;i++)
+        {
+            cp5_b_pick_physics[i].setColorBackground(color(button_color_off));
+        }
+        cp5_b_pick_physics[index].setColorBackground(color(button_color_on));
+        //controlWindow.update();
+        //controlWindow.updateEvents();
+    }
+    //else if (event_name == "multilist_files_button")
+    else if (event_name.charAt(0)=='m' && event_name.charAt(1)=='u' &&
+            event_name.charAt(2)=='l' && event_name.charAt(3)=='t' &&
+            event_name.charAt(16)=='b' && event_name.charAt(17)=='u' &&
+            event_name.charAt(18)=='t' && event_name.charAt(19)=='t'
+            )
+    {
+        int index = int(theEvent.controller().id());
+        if (index>=0)
+        {
+            infile = filenames[index];
+            reader = createReader(infile);
+            //process_file = true;
+            selected_a_file = true;
+            event_count = 0;
+        }
+        //controlWindow.update();
+        //controlWindow.updateEvents();
     }
     else if (event_name == "checkBox")
     {
@@ -835,6 +1177,15 @@ void controlEvent(ControlEvent theEvent)
         else if (blind_flag==0) { dont_show_graphics = false; }
     }
     // Process the events from the dd_sonic_X dropdown menus.
+    else if (event_name == "matrix_sonic")
+    {
+        int temp_x = cp5_matrix_sonic.getX(theEvent.controller().value());
+        int temp_y = cp5_matrix_sonic.getY(theEvent.controller().value());
+        sonic_index[temp_x] = temp_y;
+        //sonic_map_index = cp5_matrix_sonic.getY(theEvent.controller().value());
+
+        println("sonic_index: " + temp_x + "\tsonic_index val: " + temp_y);
+    }
     else if (event_name.charAt(0)=='d' && event_name.charAt(1)=='d' &&
             event_name.charAt(3)=='s')
     {
@@ -857,30 +1208,30 @@ void controlEvent(ControlEvent theEvent)
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 /*
-void keyPressed() {
-    println(char(1)+" / "+keyCode);
-    if(key==' '){
-        checkbox.deactivateAll();
-    } else {
-        for(int i=0;i<6;i++) {
-            // check if key 0-5 have been pressed and toggle
-            // the checkbox item accordingly.
-            if(keyCode==(48 + i)) { 
-                // the index of checkbox items start at 0
-                checkbox.toggle(i);
-                println("toggle "+checkbox.getItem(i).name());
-                // also see 
-                // checkbox.activate(index);
-                // checkbox.deactivate(index);
-            }
-            if (keyCode==0)
-            {
-                set_volume_to_0 = true;
-            }
-        }
-    }
+   void keyPressed() {
+   println(char(1)+" / "+keyCode);
+   if(key==' '){
+   checkbox.deactivateAll();
+   } else {
+   for(int i=0;i<6;i++) {
+// check if key 0-5 have been pressed and toggle
+// the checkbox item accordingly.
+if(keyCode==(48 + i)) { 
+// the index of checkbox items start at 0
+checkbox.toggle(i);
+println("toggle "+checkbox.getItem(i).name());
+// also see 
+// checkbox.activate(index);
+// checkbox.deactivate(index);
 }
-*/
+if (keyCode==0)
+{
+set_volume_to_0 = true;
+}
+}
+}
+}
+ */
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -949,3 +1300,29 @@ class MyInt {
         return val;
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+void toggle_mute(boolean theFlag) {
+    if(theFlag==true) {
+        set_volume_to_0 = true;
+    } else {
+        set_volume_to_0 = false;
+    }
+    println("a toggle event.");
+}
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+void toggle_blind(boolean theFlag) {
+    if(theFlag==true) {
+        dont_show_graphics = true;
+    } else {
+        dont_show_graphics = false;
+    }
+    println("a toggle event.");
+}
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+
