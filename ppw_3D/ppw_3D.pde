@@ -14,6 +14,7 @@ ControlP5 controlP5;
 
 DropdownList p1, p2;
 MultiList cp5_multilist_files;
+MultiList cp5_multilist_mapping;
 
 Matrix cp5_matrix_sonic;
 int[] sonic_index = new int[4];
@@ -23,12 +24,17 @@ Button cp5_button_play;
 Button cp5_button_stop;
 Button cp5_button_pause;
 
+Textlabel cp5_tl_map_status; 
 Textlabel[] cp5_tl_sonic_x = new Textlabel[20];
 Textlabel[] cp5_tl_sonic_y = new Textlabel[20];
 
 Button[] cp5_b_pick_physics = new Button[num_physics];
 int button_color_on = 120;
 int button_color_off = color(255,120,100);
+int mapping_button_color_off = color(60,179,113);
+
+int num_mapping = 4;
+Button[] cp5_b_pick_mapping = new Button[num_physics];
 
 RadioButton cp5_rb_pick_physics;
 
@@ -72,7 +78,7 @@ float duration_range = 10.0;
 float pitch_range = 127;
 float pan_range = 127;
 
-int sound_mapping = 0;
+int sound_mapping = -1;
 int event_time = 0;
 
 // Data file
@@ -90,6 +96,9 @@ int nranges = 15;
 float[] val_lo = new float[nranges];
 float[] val_hi = new float[nranges];
 String[] val_name = new String[nranges];
+
+int matrix_sonic_nx = sonic_labels.length;
+int matrix_sonic_ny = val_name.length;
 
 // Hash for the particle values.
 HashMap pvals = new HashMap();
@@ -139,6 +148,8 @@ float beam_size = 40;
 float beam_size_half = beam_size/2.0;
 boolean collision_occurred = false;
 ///////////////////////////////////////////////////////////////////////////////
+String mapping_button_label = "Choose a mapping";
+String[] mapping = new String[0];
 String[] filenames = new String[0];
 String[] pick_filenames = new String[0];
 String infile;
@@ -234,7 +245,7 @@ void setup()
     val_name[14] = "Detector phi";
 
     // Ranges for values to read in from data file.
-    val_lo[0] = 0.0; val_hi[0] = 30.0; // Track number (this might have to be made bigger for other experiments.
+    val_lo[0] = 0.0; val_hi[0] = 1.0; // Track number (this might have to be made bigger for other experiments.
     val_lo[1] = 0.0; val_hi[1] = 5.0; // PID, photon,electron,muon,pion,kaon,proton
     val_lo[2] = -1.0; val_hi[2] = 1.0; // Charge
     val_lo[3] = 0.0; val_hi[3] = 1.5; // Energy
@@ -329,8 +340,16 @@ void setup()
 
     //p1 = controlP5.addDropdownList("myList-p1",240,45,120,120);
     //customize_filelist(p1);
-    p2 = controlP5.addDropdownList("myList-p2",500,45,120,120);
-    customize_mapping(p2);
+    //p2 = controlP5.addDropdownList("myList-p2",500,45,120,120);
+    // Clear out the preset mappings
+    //customize_mapping(p2);
+
+    //cp5_multilist_mapping = controlP5.addMultiList("cp5_multilist_mapping",300,350,140,20);
+    //cp5_multilist_mapping.setWindow(controlWindow);
+    //customize_multilist_mapping(cp5_multilist_mapping);
+
+    //cp5_tl_map_status = controlP5.addTextlabel("tl_map_status",mapping_button_label,300,380);
+    //cp5_tl_map_status.setWindow(controlWindow);
 
     //cp5_multilist_files = controlP5.addMultiList("cp5_multilist_files",240,45,200,20);
     //cp5_multilist_files.setWindow(controlWindow);
@@ -346,7 +365,7 @@ void setup()
 
     for (int i=0;i<7;i++)
     {
-        cp5_b_pick_physics[i] = controlP5.addButton("pick_"+physics_processes[i],i,100,100+(20*i),80,19);
+        cp5_b_pick_physics[i] = controlP5.addButton("pick_"+physics_processes[i],i,70,100+(20*i),80,19);
         cp5_b_pick_physics[i].setLabel(physics_processes[i]);
         cp5_b_pick_physics[i].setColorBackground(color(button_color_off));
         cp5_b_pick_physics[i].setColorForeground(color(120));
@@ -354,6 +373,18 @@ void setup()
         cp5_b_pick_physics[i].setColorLabel(color(255));
         cp5_b_pick_physics[i].setId(i);
         cp5_b_pick_physics[i].setWindow(controlWindow);
+    }
+
+    for (int i=0;i<num_mapping;i++)
+    {
+        cp5_b_pick_mapping[i] = controlP5.addButton("mapping_pick_"+i,i,170,100+(20*i),80,19);
+        cp5_b_pick_mapping[i].setLabel("Mapping "+i);
+        cp5_b_pick_mapping[i].setColorBackground(color(mapping_button_color_off));
+        cp5_b_pick_mapping[i].setColorForeground(color(120));
+        cp5_b_pick_mapping[i].setColorActive(color(0));
+        cp5_b_pick_mapping[i].setColorLabel(color(255));
+        cp5_b_pick_mapping[i].setId(i);
+        cp5_b_pick_mapping[i].setWindow(controlWindow);
     }
 
 
@@ -367,9 +398,6 @@ void setup()
     int matrix_sonic_ypos = 40;
     int matrix_sonic_entry_width = 44;
     int matrix_sonic_entry_height = 20;
-
-    int matrix_sonic_nx = sonic_labels.length;
-    int matrix_sonic_ny = val_name.length;
 
     cp5_matrix_sonic = controlP5.addMatrix("matrix_sonic",matrix_sonic_nx,matrix_sonic_ny, matrix_sonic_xpos, matrix_sonic_ypos, matrix_sonic_entry_width*matrix_sonic_nx, matrix_sonic_entry_height*matrix_sonic_ny);
     //cp5_matrix_sonic.setInterval(1000);
@@ -474,7 +502,8 @@ void draw() {
     // Draw beams
     ///////////////////////////////////////////////////////////////////////////
     // Beam pipe
-    stroke(255,255,255,40);
+    stroke(255,255,255,60);
+    strokeWeight(4);
     line(xcenter,ycenter,20, xcenter,ycenter,screen_depth);
     noStroke();
 
@@ -675,6 +704,7 @@ void makeMusic()
                 MyInt ii = (MyInt)pvals.get("E");
                 //println("energy: " + (int)ii.getVal() + " " + norm_vals[((MyInt)pvals.get("E")).getVal()]);
                 ///*
+                float tracknum = norm_vals[((MyInt)pvals.get("tracknum")).getVal()];
                 float energy = norm_vals[((MyInt)pvals.get("E")).getVal()];
                 float time = norm_vals[((MyInt)pvals.get("dtime")).getVal()];
                 float radius = norm_vals[((MyInt)pvals.get("dr")).getVal()];
@@ -703,36 +733,30 @@ void makeMusic()
                 //volume = volume_range*energy;
                 //println(pmag);
                 volume = volume_range*(pmag-0.8)*9.0;
-                println("pmag/volume: " + pmag + " " + volume);
+                //println("pmag/volume: " + pmag + " " + volume);
 
                 if (sound_mapping==0)
+                {
+                    //println("tracknum: "+tracknum);
+                    pitch = 40 + 3*tracknum;
+                    volume = 100;
+                    duration = 2.0;
+                }
+                else if (sound_mapping==1)
                 {
                     pitch = pitch_range*(radius/2.0) + z*40 + 20;
                     if (pitch>126) pitch = 126;
                 }
-                else if (sound_mapping==1)
-                {
-                    pitch = pitch_range*(costheta);
-                }
                 else if (sound_mapping==2)
                 {
-                    pitch = pitch_range*(costheta/4.0) + 40;
+                    pitch = pitch_range* (1.0 - exp(-0.7*pmag));
+                    //println("pitch: " + pitch + " " + pitch_range + " " + pmag);
                 }
                 else if (sound_mapping==3)
                 {
-                    pitch = pitch_range*energy;
-                    //println("pitch: " + pitch + " " + pitch_range + " " + energy);
-                }
-                else if (sound_mapping==4)
-                {
                     //pitch = pitch_range*pmag;
                     pitch = pitch_range*(pmag-0.80)*6.0;
-                    println("pitch: " + pitch + " " + pitch_range + " " + pmag);
-                }
-                else if (sound_mapping==5)
-                {
-                    pitch = pitch_range* (1.0 - exp(-0.7*pmag));
-                    println("pitch: " + pitch + " " + pitch_range + " " + pmag);
+                    //println("pitch: " + pitch + " " + pitch_range + " " + pmag);
                 }
 
                 //println("volume: " + volume);
@@ -804,25 +828,33 @@ void makeMusic()
                 }
                 ///////////////////////////////////////////////////////////////////
                 ///////////////////////////////////////////////////////////////////
-                // Set the values based on the matrix settings.
+                // Set the values based on the matrix settings if a mapping
+                // is not selected.
                 ///////////////////////////////////////////////////////////////////
-                println("sonic_index: " + sonic_index[0]);
-                if(sonic_index[0]>=0)
+                if (sound_mapping == -1)
                 {
-                    pitch = pitch_range*norm_vals[sonic_index[0]];
+                    println("sonic_index: " + sonic_index[0]);
+                    if(sonic_index[0]>=0)
+                    {
+                        pitch = pitch_range*norm_vals[sonic_index[0]];
+                        if (sonic_index[0]==0)
+                        {
+                            pitch = 40 + 3*norm_vals[sonic_index[0]];
+                        }
+                    }
+                    if(sonic_index[1]>=0)
+                    {
+                        duration = duration_range*norm_vals[sonic_index[1]];
+                    }
+                    if(sonic_index[2]>=0)
+                    {
+                        volume = volume_range*norm_vals[sonic_index[2]];
+                    }
+                    //if(sonic_index[3]>=0)
+                    //{
+                    //instrument = instrument_range*norm_vals[sonic_index[3]];
+                    //}
                 }
-                if(sonic_index[1]>=0)
-                {
-                    duration = duration_range*norm_vals[sonic_index[1]];
-                }
-                if(sonic_index[2]>=0)
-                {
-                    volume = volume_range*norm_vals[sonic_index[2]];
-                }
-                //if(sonic_index[3]>=0)
-                //{
-                //instrument = instrument_range*norm_vals[sonic_index[3]];
-                //}
 
 
 
@@ -958,6 +990,22 @@ void customize_rb_pick_physics(RadioButton rb) {
 
 }
 ///////////////////////////////////////////////////////////////////////////////
+void customize_multilist_mapping(MultiList ml) {
+    MultiListButton b;
+    b = ml.add("Choose a mapping",1);
+    b.setId(-3);
+
+    // Make some drop down items
+    int nfiles = filenames.length;
+    for(int i=0;i<nfiles;i++) {
+        MultiListButton c = b.add("multilist_button_mapping"+i,20+i+1);
+        c.setLabel("Mapping "+i);
+        c.setColorBackground(color(64 + 18*i,0,0));
+        c.setId(i);
+    }
+
+}
+///////////////////////////////////////////////////////////////////////////////
 void customize_multilist_files(MultiList ml) {
     MultiListButton b;
     b = ml.add("Choose a file",1);
@@ -1003,8 +1051,8 @@ void customize_mapping(DropdownList ddl) {
     ddl.captionLabel().style().marginTop = 3;
     ddl.valueLabel().style().marginTop = 3;
     // Make some drop down items
-    int num_mappings = 6;
-    for(int i=0;i<num_mappings;i++) {
+    //int num_mapping = 6;
+    for(int i=0;i<num_mapping;i++) {
         String name = "Mapping " + i;
         ddl.addItem(name,i);
     }
@@ -1145,6 +1193,34 @@ void controlEvent(ControlEvent theEvent)
         //controlWindow.update();
         //controlWindow.updateEvents();
     }
+    else if (event_name.charAt(0)=='m' && event_name.charAt(1)=='a' &&
+            event_name.charAt(8)=='p' && event_name.charAt(9)=='i' &&
+            event_name.charAt(10)=='c' && event_name.charAt(11)=='k'
+            )
+    {
+        println("Here is a mapping pick from mapping_pick_" + event_name);
+        int index = int(theEvent.controller().id());
+        println("a index: -------------------------- " + index);
+        if (index>=0)
+        {
+            // Clear out the matrix settings
+            for (int i=0;i<4;i++)
+            {
+                for(int j=0;j<matrix_sonic_ny;j++)
+                {
+                    cp5_matrix_sonic.set(i,j,false);
+                }
+                sonic_index[i] = -1;
+            }
+
+            sound_mapping = index;
+        }
+        for (int i=0;i<num_mapping;i++)
+        {
+            cp5_b_pick_mapping[i].setColorBackground(color(mapping_button_color_off));
+        }
+        cp5_b_pick_mapping[index].setColorBackground(color(button_color_on));
+    }
     //else if (event_name == "multilist_files_button")
     else if (event_name.charAt(0)=='m' && event_name.charAt(1)=='u' &&
             event_name.charAt(2)=='l' && event_name.charAt(3)=='t' &&
@@ -1185,6 +1261,12 @@ void controlEvent(ControlEvent theEvent)
         //sonic_map_index = cp5_matrix_sonic.getY(theEvent.controller().value());
 
         println("sonic_index: " + temp_x + "\tsonic_index val: " + temp_y);
+        sound_mapping = -1;
+        // Clear out the preset mappings
+        for (int i=0;i<num_mapping;i++)
+        {
+            cp5_b_pick_mapping[i].setColorBackground(color(mapping_button_color_off));
+        }
     }
     else if (event_name.charAt(0)=='d' && event_name.charAt(1)=='d' &&
             event_name.charAt(3)=='s')
