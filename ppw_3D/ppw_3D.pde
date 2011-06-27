@@ -786,7 +786,7 @@ void makeMusic()
                 if (pan<0) pan=0;
                 if (pan>127) pan=127;
 
-                duration = 5.0;
+                duration = 2.0;
 
                 ///////////////////////////////////////////////////////////////////
                 boolean found_time = false;
