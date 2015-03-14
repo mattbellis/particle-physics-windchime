@@ -1,0 +1,1 @@
+We are developing an application that will take data from particle physics experiments and turning it into sound. Ideally, we would also like to provide visual queues. We are working with Processing and Soundcipher. We want to create an interface so that users can select their own mapping from particle/detector properties onto sonic properties.
